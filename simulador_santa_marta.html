@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador Hidráulico 3D - Santa Marta</title>
+    <!-- Importar Three.js desde CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        :root {
+            --primary: #0284c7;
+            --primary-dark: #0369a1;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --border-color: #cbd5e1;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        header {
+            text-align: center;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+        header h1 {
+            color: var(--primary-dark);
+            margin: 0 0 5px 0;
+            font-size: 1.8rem;
+        }
+        header p {
+            color: #64748b;
+            margin: 0;
+            font-size: 0.95rem;
+        }
+        .section-title {
+            color: var(--primary-dark);
+            border-left: 4px solid var(--primary);
+            padding-left: 10px;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+        .card {
+            background: #f1f5f9;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+        .value-display {
+            font-weight: bold;
+            color: var(--primary);
+            float: right;
+        }
+        /* Contenedor del Canvas 3D */
+        #canvas3d-container {
+            width: 100%;
+            height: 240px;
+            background: #cbd5e1;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+        .tank-stats {
+            text-align: center;
+            margin-top: 10px;
+            font-weight: bold;
+            font-size: 0.95rem;
+        }
+        .results-box {
+            background: #e0f2fe;
+            border: 1px solid #7dd3fc;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        .results-box p {
+            margin: 5px 0;
+            font-size: 0.95rem;
+        }
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 0.85rem;
+            color: #94a3b8;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Simulador Hidráulico 3D (Three.js)</h1>
+        <p>Proyecto Final de Modelación y Simulación Hidráulica - Santa Marta | Asignatura: Álgebra y Geometría Analítica</p>
+    </header>
+
+    <!-- MÓDULO 1: TANQUE 3D Y CAUDALES -->
+    <div class="section-title">1. Simulación 3D de Tanque y Balance de Caudales (Decimales)</div>
+    <div class="grid">
+        <div class="card">
+            <div class="control-group">
+                <label>Volumen Inicial del Tanque: <span id="valVolIni" class="value-display">1000 L</span></label>
+                <input type="range" id="volIni" min="100" max="2000" step="50" value="1000" oninput="actualizarSimulacion()">
+            </div>
+            <div class="control-group">
+                <label>Caudal de Entrada (Ein): <span id="valEin" class="value-display">2.85 L/s</span></label>
+                <input type="range" id="ein" min="0.0" max="5.0" step="0.05" value="2.85" oninput="actualizarSimulacion()">
+            </div>
+            <div class="control-group">
+                <label>Caudal de Salida (Sout): <span id="valSout" class="value-display">2.10 L/s</span></label>
+                <input type="range" id="sout" min="0.0" max="5.0" step="0.05" value="2.10" oninput="actualizarSimulacion()">
+            </div>
+            <div class="control-group">
+                <label>Intervalo de Tiempo: <span id="valTiempo" class="value-display">60 s</span></label>
+                <input type="range" id="tiempo" min="10" max="300" step="10" value="60" oninput="actualizarSimulacion()">
+            </div>
+        </div>
+
+        <div class="card" style="text-align: center;">
+            <div id="canvas3d-container"></div>
+            <div class="tank-stats" id="txtVolumenFinal">Volumen Final: 1045 L</div>
+            <div class="results-box" id="txtEstadoTanque" style="color: #0369a1;">
+                ¡El tanque está acumulando agua! (+45 L)
+            </div>
+        </div>
+    </div>
+
+    <!-- MÓDULO 2: ECUACIÓN LINEAL (COSTOS) -->
+    <div class="section-title">2. Ecuación Lineal: Estimación de Costo de Bombeo $C(V) = 250V + 1500$</div>
+    <div class="grid">
+        <div class="card">
+            <div class="control-group">
+                <label>Volumen Bombeado ($V$): <span id="valVLineal" class="value-display">10 unidades</span></label>
+                <input type="range" id="vLineal" min="1" max="50" step="1" value="10" oninput="actualizarLineal()">
+            </div>
+            <p style="font-size: 0.9rem; color: #475569;">* $250$ es el costo variable por unidad y $1.500$ representa el cargo fijo institucional o de operación.</p>
+        </div>
+        <div class="card" style="display: flex; flex-direction: column; justify-content: center;">
+            <div class="results-box">
+                <p><strong>Costo Estimado:</strong></p>
+                <p id="resLineal" style="font-size: 1.2rem; font-weight: bold; color: var(--primary-dark);">$ 4,000 pesos</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MÓDULO 3: ECUACIÓN CUADRÁTICA (CANAL RECTANGULAR) -->
+    <div class="section-title">3. Ecuación Cuadrática: Área de Sección Transversal de Canal $A(x) = x(6 - x)$</div>
+    <div class="grid">
+        <div class="card">
+            <div class="control-group">
+                <label>Ancho del Canal ($x$): <span id="valXCanal" class="value-display">2.0 m</span></label>
+                <input type="range" id="xCanal" min="0.5" max="5.5" step="0.1" value="2.0" oninput="actualizarCuadratica()">
+            </div>
+            <p style="font-size: 0.9rem; color: #475569;">* Suponiendo una restricción geométrica donde la suma de ancho y profundidad es $6$ metros ($h = 6 - x$).</p>
+        </div>
+        <div class="card" style="display: flex; flex-direction: column; justify-content: center;">
+            <div class="results-box">
+                <p><strong>Profundidad calculada ($h$):</strong> <span id="resH">4.00 m</span></p>
+                <p><strong>Área Transversal ($A$):</strong> <span id="resArea" style="font-size: 1.2rem; font-weight: bold; color: var(--primary-dark);">8.00 m²</span></p>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        Simulador Educativo 3D - Álgebra y Geometría Analítica | Universidad / Institución - Santa Marta 2026
+    </footer>
+</div>
+
+<script>
+    // --- CONFIGURACIÓN THREE.JS (ESCENA 3D) ---
+    let scene, camera, renderer, waterMesh;
+    const maxTankHeight = 3.0; // Altura máxima del cilindro 3D del tanque
+
+    function init3D() {
+        const container = document.getElementById('canvas3d-container');
+        
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xe2e8f0);
+
+        camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(0, 2.5, 6);
+        camera.lookAt(0, 0, 0);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        container.appendChild(renderer.domElement);
+
+        // Luces
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 10, 7);
+        scene.add(directionalLight);
+
+        // Estructura transparente del tanque (Cilindro exterior)
+        const tankGeometry = new THREE.CylinderGeometry(1.2, 1.2, maxTankHeight, 32, 1, true);
+        const tankMaterial = new THREE.MeshPhysicalMaterial({
+            color: 0x94a3b8,
+            transparent: true,
+            opacity: 0.3,
+            side: THREE.DoubleSide,
+            roughness: 0.1
+        });
+        const tankMesh = new THREE.Mesh(tankGeometry, tankMaterial);
+        tankMesh.position.y = maxTankHeight / 2 - 1.0;
+        scene.add(tankMesh);
+
+        // Agua interior del tanque (Cilindro de agua)
+        const waterGeometry = new THREE.CylinderGeometry(1.15, 1.15, 1, 32);
+        const waterMaterial = new THREE.MeshLambertMaterial({
+            color: 0x0284c7,
+            transparent: true,
+            opacity: 0.8
+        });
+        waterMesh = new THREE.Mesh(waterGeometry, waterMaterial);
+        waterMesh.geometry.translate(0, 0.5, 0); // Ajustar origen en la base
+        waterMesh.position.y = -1.0; // Posicionar en la base del tanque
+        scene.add(waterMesh);
+
+        animate3D();
+    }
+
+    function animate3D() {
+        requestAnimationFrame(animate3D);
+        // Pequeña rotación automática del tanque para dar efecto tridimensional estético
+        scene.rotation.y += 0.005;
+        renderer.render(scene, camera);
+    }
+
+    function actualizarSimulacion() {
+        let volIni = parseFloat(document.getElementById('volIni').value);
+        let ein = parseFloat(document.getElementById('ein').value);
+        let sout = parseFloat(document.getElementById('sout').value);
+        let tiempo = parseFloat(document.getElementById('tiempo').value);
+
+        document.getElementById('valVolIni').innerText = volIni + " L";
+        document.getElementById('valEin').innerText = ein.toFixed(2) + " L/s";
+        document.getElementById('valSout').innerText = sout.toFixed(2) + " L/s";
+        document.getElementById('valTiempo').innerText = tiempo + " s";
+
+        let cambioVol = (ein - sout) * tiempo;
+        let volFinal = volIni + cambioVol;
+        if (volFinal < 0) volFinal = 0;
+
+        document.getElementById('txtVolumenFinal').innerText = "Volumen Final: " + volFinal.toFixed(2) + " L";
+
+        let estadoTxt = "";
+        if (cambioVol > 0) {
+            estadoTxt = "¡El tanque está acumulando agua! (+" + cambioVol.toFixed(2) + " L)";
+        } else if (cambioVol < 0) {
+            estadoTxt = "¡Atención! El tanque está perdiendo agua (" + cambioVol.toFixed(2) + " L)";
+        } else {
+            estadoTxt = "El volumen del tanque se mantiene estable (Equilibrio).";
+        }
+        document.getElementById('txtEstadoTanque').innerText = estadoTxt;
+
+        // Actualizar la escala de altura del objeto 3D del agua (máximo 2000L)
+        let porcentaje = volFinal / 2000;
+        if (porcentaje > 1) porcentaje = 1;
+        if (waterMesh) {
+            waterMesh.scale.y = porcentaje;
+        }
+    }
+
+    function actualizarLineal() {
+        let v = parseFloat(document.getElementById('vLineal').value);
+        document.getElementById('valVLineal').innerText = v + " unidades";
+        let costo = 250 * v + 1500;
+        document.getElementById('resLineal').innerText = "$ " + costo.toLocaleString() + " pesos";
+    }
+
+    function actualizarCuadratica() {
+        let x = parseFloat(document.getElementById('xCanal').value);
+        document.getElementById('valXCanal').innerText = x.toFixed(1) + " m";
+        let h = 6 - x;
+        let area = x * h;
+        document.getElementById('resH').innerText = h.toFixed(2) + " m";
+        document.getElementById('resArea').innerText = area.toFixed(2) + " m²";
+    }
+
+    // Inicializar todo al cargar la página
+    window.onload = function() {
+        init3D();
+        actualizarSimulacion();
+        actualizarLineal();
+        actualizarCuadratica();
+    };
+</script>
+
+</body>
+</html>
